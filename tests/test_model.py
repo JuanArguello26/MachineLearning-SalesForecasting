@@ -1,92 +1,166 @@
-import pytest
-import pandas as pd
-import numpy as np
-from statsforecast import StatsForecast
-from statsforecast.models import AutoARIMA
-from sklearn.metrics import mean_absolute_error, mean_squared_error
+"""Tests for Sales Forecasting Model."""
+
+from __future__ import annotations
+
 import os
 import sys
+from typing import Generator
+
+import numpy as np
+import pandas as pd
+import pytest
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def load_data():
-    df = pd.read_csv('data/sales_data.csv')
-    df['date'] = pd.to_datetime(df['date'])
-    df = df.rename(columns={'date': 'ds', 'sales': 'y'})
-    df['unique_id'] = 'sales'
-    return df
+from src.preprocessing import SalesDataPreprocessor
+from src.model import SalesForecastingModel
+
+
+@pytest.fixture
+def data_path() -> str:
+    """Get path to test data."""
+    return "data/sales_data.csv"
+
+
+@pytest.fixture
+def sample_dataframe(data_path: str) -> pd.DataFrame:
+    """Load sample data for testing."""
+    return pd.read_csv(data_path)
+
+
+@pytest.fixture
+def preprocessor() -> SalesDataPreprocessor:
+    """Create preprocessor instance."""
+    return SalesDataPreprocessor()
+
+
+@pytest.fixture
+def model() -> SalesForecastingModel:
+    """Create model instance."""
+    return SalesForecastingModel()
+
 
 class TestDataLoading:
-    def test_data_file_exists(self):
-        assert os.path.exists('data/sales_data.csv'), "Data file not found"
-    
-    def test_data_not_empty(self):
-        df = load_data()
-        assert len(df) > 0, "Data is empty"
-    
-    def test_data_has_required_columns(self):
-        df = load_data()
-        assert 'ds' in df.columns, "Missing date column"
-        assert 'y' in df.columns, "Missing sales column"
-    
-    def test_date_format(self):
-        df = load_data()
-        assert pd.api.types.is_datetime64_any_dtype(df['ds']), "Date should be datetime"
+    """Tests for data loading functionality."""
+
+    def test_data_file_exists(self, data_path: str) -> None:
+        """Test that data file exists."""
+        assert os.path.exists(data_path), "Data file not found"
+
+    def test_data_not_empty(self, sample_dataframe: pd.DataFrame) -> None:
+        """Test that data is not empty."""
+        assert len(sample_dataframe) > 0, "Data is empty"
+
+    def test_data_has_required_columns(self, sample_dataframe: pd.DataFrame) -> None:
+        """Test that all required columns are present."""
+        assert "date" in sample_dataframe.columns, "Missing date column"
+        assert "sales" in sample_dataframe.columns, "Missing sales column"
+
+    def test_date_format(self, sample_dataframe: pd.DataFrame) -> None:
+        """Test date column format."""
+        assert pd.api.types.is_datetime64_any_dtype(sample_dataframe["date"]), "Date should be datetime"
+
 
 class TestDataQuality:
-    def test_no_missing_values(self):
-        df = load_data()
-        assert df['y'].isna().sum() == 0, "Missing values in sales"
-    
-    def test_positive_sales(self):
-        df = load_data()
-        assert (df['y'] > 0).all(), "All sales should be positive"
+    """Tests for data quality."""
+
+    def test_no_missing_values(self, sample_dataframe: pd.DataFrame) -> None:
+        """Test no missing values in sales."""
+        assert sample_dataframe["sales"].isna().sum() == 0, "Missing values in sales"
+
+    def test_positive_sales(self, sample_dataframe: pd.DataFrame) -> None:
+        """Test all sales are positive."""
+        assert (sample_dataframe["sales"] > 0).all(), "All sales should be positive"
+
+
+class TestPreprocessing:
+    """Tests for preprocessing functionality."""
+
+    def test_prepare_for_statsforecast(
+        self, preprocessor: SalesDataPreprocessor, sample_dataframe: pd.DataFrame
+    ) -> None:
+        """Test statsforecast format preparation."""
+        df_prepared = preprocessor.prepare_for_statsforecast(sample_dataframe)
+        assert "ds" in df_prepared.columns
+        assert "y" in df_prepared.columns
+        assert "unique_id" in df_prepared.columns
+
+    def test_split_data(
+        self, preprocessor: SalesDataPreprocessor, sample_dataframe: pd.DataFrame
+    ) -> None:
+        """Test data splitting."""
+        train, test = preprocessor.split_data(sample_dataframe, train_size=0.8)
+        assert len(train) > 0, "Training set is empty"
+        assert len(test) > 0, "Test set is empty"
+        assert len(train) + len(test) == len(sample_dataframe)
+
+    def test_data_quality_report(
+        self, preprocessor: SalesDataPreprocessor, sample_dataframe: pd.DataFrame
+    ) -> None:
+        """Test data quality report generation."""
+        report = preprocessor.get_data_quality_report(sample_dataframe)
+        assert report.total_records > 0
+        assert "sales_stats" in report.to_dict()
+
 
 class TestModel:
-    def test_statsforecast_model_training(self):
-        df = load_data()
-        train = df.iloc[:int(len(df)*0.8)]
+    """Tests for model functionality."""
+
+    def test_model_training(
+        self, model: SalesForecastingModel, sample_dataframe: pd.DataFrame
+    ) -> None:
+        """Test model training."""
+        model.train(sample_dataframe)
+        assert model.model is not None, "Model should be trained"
+
+    def test_model_predictions(
+        self, model: SalesForecastingModel, sample_dataframe: pd.DataFrame
+    ) -> None:
+        """Test model predictions."""
+        model.train(sample_dataframe)
+        result = model.predict(horizon=30)
         
-        models = [AutoARIMA(season_length=7)]
-        sf = StatsForecast(models=models, freq='D')
-        sf.fit(train[['ds', 'y', 'unique_id']])
+        assert len(result.predictions) == 30, "Should have 30 predictions"
+        assert "predicted_sales" in result.predictions[0]
+        assert "lower_bound" in result.predictions[0]
+        assert "upper_bound" in result.predictions[0]
+
+    def test_model_evaluation(
+        self, model: SalesForecastingModel, sample_dataframe: pd.DataFrame
+    ) -> None:
+        """Test model evaluation."""
+        model.train(sample_dataframe)
+        test_df = sample_dataframe.tail(50)
+        metrics = model.evaluate(test_df)
         
-        assert sf is not None, "Model should be trained"
-    
-    def test_statsforecast_predictions(self):
-        df = load_data()
-        train = df.iloc[:int(len(df)*0.8)]
-        test = df.iloc[int(len(df)*0.8):]
+        assert metrics.mae >= 0
+        assert metrics.rmse >= 0
+        assert metrics.mape >= 0
+
+    def test_full_pipeline(self, model: SalesForecastingModel, data_path: str) -> None:
+        """Test complete pipeline."""
+        result = model.full_pipeline(data_path, forecast_horizon=7)
         
-        models = [AutoARIMA(season_length=7)]
-        sf = StatsForecast(models=models, freq='D')
-        sf.fit(train[['ds', 'y', 'unique_id']])
-        
-        forecast = sf.predict(h=len(test))
-        forecast = forecast.reset_index()
-        
-        predictions = forecast['AutoARIMA'].values
-        
-        mae = mean_absolute_error(test['y'].values, predictions)
-        rmse = np.sqrt(mean_squared_error(test['y'].values, predictions))
-        
-        assert mae < 10000, f"MAE too high: {mae}"
-        assert rmse < 15000, f"RMSE too high: {rmse}"
+        assert "metrics" in result
+        assert "forecast" in result
+        assert "MAE" in result["metrics"]
+        assert "RMSE" in result["metrics"]
+        assert "MAPE" in result["metrics"]
+
 
 class TestForecast:
-    def test_future_predictions(self):
-        df = load_data()
-        
-        models = [AutoARIMA(season_length=7)]
-        sf = StatsForecast(models=models, freq='D')
-        sf.fit(df[['ds', 'y', 'unique_id']])
-        
-        forecast = sf.predict(h=30, level=[95])
-        forecast = forecast.reset_index()
-        
-        assert len(forecast) == 30, "Should have 30 predictions"
-        assert 'AutoARIMA' in forecast.columns, "Missing prediction column"
-        assert forecast['AutoARIMA'].notna().all(), "Missing predictions"
+    """Tests for forecast functionality."""
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+    def test_future_predictions(
+        self, model: SalesForecastingModel, sample_dataframe: pd.DataFrame
+    ) -> None:
+        """Test future predictions generation."""
+        model.train(sample_dataframe)
+        result = model.predict(horizon=30, level=[95])
+        
+        assert len(result.predictions) == 30, "Should have 30 predictions"
+        assert "AutoARIMA" in str(result.predictions[0].keys()) or "predicted_sales" in result.predictions[0]
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

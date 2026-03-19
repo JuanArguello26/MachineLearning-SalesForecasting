@@ -1,5 +1,9 @@
 # Sales Forecasting API
 
+![Python](https://img.shields.io/badge/python-3.10+-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-yellow.svg)
+![CI](https://github.com/JuanArguello26/MachineLearning-SalesForecasting/actions/workflows/ci.yml/badge.svg)
+
 API REST para predecir ventas futuras utilizando series temporales con StatsForecast.
 
 ## Descripción del Proyecto
@@ -19,16 +23,28 @@ Este proyecto implementa un modelo de predicción de ventas utilizando **StatsFo
 ```
 sales-forecasting/
 ├── api/
-│   └── main.py          # API REST
+│   └── main.py              # API REST con FastAPI
 ├── data/
-│   └── sales_data.csv   # Dataset
+│   └── sales_data.csv       # Dataset
 ├── models/
-│   └── *.csv           # Resultados guardados
+│   └── forecast_results.csv # Resultados de predicciones
 ├── notebooks/
-│   └── eda.ipynb       # Análisis exploratorio
+│   └── eda.ipynb            # Análisis exploratorio
+├── src/
+│   ├── __init__.py
+│   ├── config.py            # Configuración del modelo
+│   ├── preprocessing.py    # Preprocesamiento de datos
+│   └── model.py            # Lógica de entrenamiento y predicción
 ├── tests/
-│   └── test_model.py   # Tests
+│   ├── test_model.py        # Tests del modelo
+│   └── test_api.py          # Tests de la API
+├── .github/
+│   └── workflows/
+│       └── ci.yml           # GitHub Actions CI/CD
+├── .pre-commit-config.yaml  # Pre-commit hooks
+├── Dockerfile
 ├── requirements.txt
+├── pyproject.toml
 └── README.md
 ```
 
@@ -36,7 +52,7 @@ sales-forecasting/
 
 ```bash
 # Clonar el repositorio
-git clone <repo-url>
+git clone https://github.com/JuanArguello26/MachineLearning-SalesForecasting.git
 cd sales-forecasting
 
 # Crear entorno virtual
@@ -60,7 +76,7 @@ uvicorn main:app --reload
 
 La API estará disponible en: `http://localhost:8000`
 
-### Documentación Interactive
+### Documentación Interactiva
 
 - Swagger UI: `http://localhost:8000/docs`
 - ReDoc: `http://localhost:8000/redoc`
@@ -98,9 +114,14 @@ pytest tests/ -v
 
 ## Deployment
 
-### Railway
+### Docker
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app)
+```bash
+docker build -t sales-forecasting .
+docker run -p 8000:8000 sales-forecasting
+```
+
+### Railway
 
 1. Conectar repositorio a Railway
 2. Establecer `PYTHON_VERSION` = `3.10`
@@ -135,6 +156,21 @@ El dataset contiene ventas diarias con las siguientes características:
 - Período: 2023 (año completo)
 - Rango de ventas: $12,500 - $30,000 diario
 - Tendencia: Creciente a lo largo del año
+
+## Desarrollo
+
+### Pre-commit hooks
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+### Linting
+
+```bash
+ruff check .
+```
 
 ## Licencia
 
