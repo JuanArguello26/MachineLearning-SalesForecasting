@@ -6,4 +6,5 @@ statsforecast
 scikit-learn
 fastapi
 uvicorn
+pydantic
 pytest
