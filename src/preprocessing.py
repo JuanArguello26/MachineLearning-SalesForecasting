@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import Any
 
 import pandas as pd
-import numpy as np
 
 
 @dataclass
@@ -56,8 +55,8 @@ class SalesDataPreprocessor:
     def get_data_quality_report(self, df: pd.DataFrame) -> DataQualityReport:
         """Generate data quality report."""
         return DataQualityReport(
-            total_records=len(df),
-            missing_values=df["sales"].isna().sum(),
+            total_records=int(len(df)),
+            missing_values=int(df["sales"].isna().sum()),
             date_range=(str(df["date"].min()), str(df["date"].max())),
             sales_stats={
                 "min": float(df["sales"].min()),

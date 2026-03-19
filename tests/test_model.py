@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Generator
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -23,9 +21,9 @@ def data_path() -> str:
 
 
 @pytest.fixture
-def sample_dataframe(data_path: str) -> pd.DataFrame:
+def sample_dataframe(preprocessor: SalesDataPreprocessor, data_path: str) -> pd.DataFrame:
     """Load sample data for testing."""
-    return pd.read_csv(data_path)
+    return preprocessor.load_data(data_path)
 
 
 @pytest.fixture

@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any
 
 from fastapi import FastAPI
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from src.model import SalesForecastingModel
@@ -20,7 +20,8 @@ app = FastAPI(
 preprocessor = SalesDataPreprocessor()
 model = SalesForecastingModel()
 
-df = preprocessor.load_data("../data/sales_data.csv")
+data_path = os.path.join(os.path.dirname(__file__), "..", "data", "sales_data.csv")
+df = preprocessor.load_data(data_path)
 model.train(df)
 
 
